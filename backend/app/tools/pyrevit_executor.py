@@ -62,15 +62,33 @@ class PyRevitExecutorTool(BaseTool):
         
         start_time = time.time()
         
+        # FORCE debug info into response regardless of what happens
+        debug_response = {
+            "success": False,
+            "output": "DEBUG: Starting execution...",
+            "error": "DEBUG: About to validate code...",
+            "execution_time": 0.0,
+            "revit_state": {},
+            "debug_info": {
+                "step": "initialization",
+                "code_length": len(code),
+                "timeout": timeout,
+                "capture_output": capture_output
+            }
+        }
+        
         try:
             # Validate the code first
+            debug_response["debug_info"]["step"] = "validation"
             validation_result = self._validate_code(code)
             if not validation_result["is_valid"]:
-                return {
+                debug_response.update({
                     "success": False,
                     "error": f"Code validation failed: {validation_result['error']}",
-                    "execution_time": time.time() - start_time
-                }
+                    "execution_time": time.time() - start_time,
+                    "debug_info": {**debug_response["debug_info"], "validation_error": validation_result['error']}
+                })
+                return debug_response
             
             # Prepare the script for execution
             prepared_code = self._prepare_code(code, capture_output)
@@ -103,11 +121,13 @@ class PyRevitExecutorTool(BaseTool):
             }
         except Exception as e:
             logger.error("Script execution failed", error=str(e))
-            return {
+            debug_response.update({
                 "success": False,
-                "error": str(e),
-                "execution_time": time.time() - start_time
-            }
+                "error": f"EXCEPTION: {str(e)}",
+                "execution_time": time.time() - start_time,
+                "debug_info": {**debug_response["debug_info"], "exception": str(e), "step": "exception_caught"}
+            })
+            return debug_response
     
     def _validate_code(self, code: str) -> Dict[str, Any]:
         """Validate Python code for safety and syntax."""
