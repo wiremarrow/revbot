@@ -265,32 +265,45 @@ print("===REVITAI_RESULT_END===")
         
         # First check if pyRevit CLI is available
         try:
-            # Use ProactorEventLoop on Windows to fix subprocess issues
+            # Use synchronous subprocess on Windows to avoid asyncio issues
             if sys.platform == "win32":
-                loop = asyncio.get_event_loop()
-                if not isinstance(loop, asyncio.ProactorEventLoop):
-                    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-            
-            check_process = await asyncio.create_subprocess_exec(
-                'pyrevit',
-                '--version',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await check_process.communicate()
-            if check_process.returncode != 0:
-                return {
-                    "success": False,
-                    "output": "",
-                    "error": "pyRevit CLI not found or not working. Install pyRevit and ensure it's in PATH.",
-                    "revit_state": {}
-                }
-            logger.info("pyRevit CLI found", version=stdout.decode('utf-8').strip())
-        except FileNotFoundError:
+                import subprocess
+                result = subprocess.run(
+                    ['pyrevit', '--version'],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode != 0:
+                    return {
+                        "success": False,
+                        "output": "",
+                        "error": f"pyRevit CLI not working. Return code: {result.returncode}. stderr: {result.stderr}",
+                        "revit_state": {}
+                    }
+                logger.info("pyRevit CLI found", version=result.stdout.strip())
+            else:
+                # Use async subprocess on non-Windows
+                check_process = await asyncio.create_subprocess_exec(
+                    'pyrevit',
+                    '--version',
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await check_process.communicate()
+                if check_process.returncode != 0:
+                    return {
+                        "success": False,
+                        "output": "",
+                        "error": "pyRevit CLI not found or not working. Install pyRevit and ensure it's in PATH.",
+                        "revit_state": {}
+                    }
+                logger.info("pyRevit CLI found", version=stdout.decode('utf-8').strip())
+        except (FileNotFoundError, subprocess.SubprocessError) as e:
             return {
                 "success": False,
                 "output": "",
-                "error": "pyRevit CLI not found. Install pyRevit and ensure 'pyrevit' command is in PATH.",
+                "error": f"pyRevit CLI not found: {str(e)}. Install pyRevit and ensure 'pyrevit' command is in PATH.",
                 "revit_state": {}
             }
         
@@ -308,31 +321,40 @@ print("===REVITAI_RESULT_END===")
             # Execute using pyrevit run command
             logger.info("Executing pyRevit CLI", script_path=script_path)
             
-            # Ensure ProactorEventLoop on Windows
             if sys.platform == "win32":
-                loop = asyncio.get_event_loop()
-                if not isinstance(loop, asyncio.ProactorEventLoop):
-                    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-            
-            process = await asyncio.create_subprocess_exec(
-                'pyrevit',
-                'run',
-                script_path,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(),
-                timeout=timeout
-            )
-            
-            output = stdout.decode('utf-8')
-            error = stderr.decode('utf-8') if stderr else None
+                # Use synchronous subprocess on Windows
+                import subprocess
+                result = subprocess.run(
+                    ['pyrevit', 'run', script_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout
+                )
+                output = result.stdout
+                error = result.stderr if result.stderr else None
+                return_code = result.returncode
+            else:
+                # Use async subprocess on non-Windows
+                process = await asyncio.create_subprocess_exec(
+                    'pyrevit',
+                    'run',
+                    script_path,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(),
+                    timeout=timeout
+                )
+                
+                output = stdout.decode('utf-8')
+                error = stderr.decode('utf-8') if stderr else None
+                return_code = process.returncode
             
             logger.info(
                 "pyRevit CLI execution completed",
-                return_code=process.returncode,
+                return_code=return_code,
                 stdout_length=len(output),
                 stderr_length=len(error) if error else 0
             )
@@ -342,14 +364,14 @@ print("===REVITAI_RESULT_END===")
                 return self._parse_wrapped_output(output)
             
             # If no output and immediate failure, likely Revit connection issue
-            if process.returncode != 0 and not output and not error:
+            if return_code != 0 and not output and not error:
                 return {
                     "success": False,
-                    "output": f"DEBUG: No output from pyRevit. Return code: {process.returncode}",
-                    "error": f"pyRevit executed but no response from Revit. Return code: {process.returncode}. Check: 1) Revit is running, 2) pyRevit is loaded in Revit, 3) A document is open in Revit",
+                    "output": f"DEBUG: No output from pyRevit. Return code: {return_code}",
+                    "error": f"pyRevit executed but no response from Revit. Return code: {return_code}. Check: 1) Revit is running, 2) pyRevit is loaded in Revit, 3) A document is open in Revit",
                     "revit_state": {},
                     "debug_info": {
-                        "return_code": process.returncode,
+                        "return_code": return_code,
                         "execution_time": f"~0.0003s (immediate failure)",
                         "script_path": script_path,
                         "pyrevit_command": f"pyrevit run {script_path}"
@@ -357,12 +379,12 @@ print("===REVITAI_RESULT_END===")
                 }
             
             return {
-                "success": process.returncode == 0,
-                "output": output if output else f"DEBUG: Empty output. Return code: {process.returncode}",
-                "error": error if error else f"No stderr. Return code: {process.returncode}",
+                "success": return_code == 0,
+                "output": output if output else f"DEBUG: Empty output. Return code: {return_code}",
+                "error": error if error else f"No stderr. Return code: {return_code}",
                 "revit_state": {},
                 "debug_info": {
-                    "return_code": process.returncode,
+                    "return_code": return_code,
                     "script_path": script_path,
                     "pyrevit_command": f"pyrevit run {script_path}",
                     "stdout_length": len(output),
