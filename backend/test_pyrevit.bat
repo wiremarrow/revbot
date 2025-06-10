@@ -39,18 +39,28 @@ if not exist test_simple.py (
 
 echo.
 echo Attempting to run test_simple.py...
-pyrevit run test_simple.py
+pyrevit run test_simple.py > test_output.txt 2>&1
+type test_output.txt
+
+echo.
+echo Analyzing results...
+findstr /C:"Hello from pyRevit!" test_output.txt >nul
 if errorlevel 1 (
-    echo ❌ FAILED: Could not execute script
-    echo.
-    echo Common issues:
-    echo 1. No Revit instance running
-    echo 2. No document open in Revit
-    echo 3. pyRevit not loaded in Revit
-    echo 4. pyRevit CLI can't connect to Revit
+    echo ❌ FAILED: Script did not execute properly
+    findstr /C:"Model does not exist" test_output.txt >nul
+    if not errorlevel 1 (
+        echo    Issue: "Model does not exist" - No Revit document is open
+        echo.
+        echo    Solution:
+        echo    1. Open Revit
+        echo    2. Create a new project or open an existing one
+        echo    3. Then run this test again
+    )
 ) else (
-    echo ✅ PASSED: Script executed successfully
+    echo ✅ SUCCESS: Script executed and printed output!
 )
+
+del test_output.txt 2>nul
 
 echo.
 echo ========================================
