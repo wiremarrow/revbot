@@ -300,11 +300,29 @@ print("===REVITAI_RESULT_END===")
             if "===REVITAI_RESULT_START===" in output:
                 return self._parse_wrapped_output(output)
             
+            # If no output and immediate failure, likely Revit connection issue
+            if process.returncode != 0 and not output and not error:
+                return {
+                    "success": False,
+                    "output": "",
+                    "error": "pyRevit executed but no response from Revit. Check: 1) Revit is running, 2) pyRevit is loaded in Revit, 3) A document is open in Revit",
+                    "revit_state": {},
+                    "debug_info": {
+                        "return_code": process.returncode,
+                        "execution_time": f"{timeout}s timeout",
+                        "script_path": script_path
+                    }
+                }
+            
             return {
                 "success": process.returncode == 0,
                 "output": output,
                 "error": error,
-                "revit_state": {}
+                "revit_state": {},
+                "debug_info": {
+                    "return_code": process.returncode,
+                    "script_path": script_path
+                }
             }
             
         finally:
