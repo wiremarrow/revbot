@@ -76,11 +76,13 @@ class PyRevitExecutorTool(BaseTool):
             prepared_code = self._prepare_code(code, capture_output)
             
             # Execute via pyRevit (two methods supported)
-            if settings.pyrevit_port:
+            if settings.pyrevit_port is not None and settings.pyrevit_port > 0:
                 # Method 1: WebSocket communication with pyRevit server
+                logger.info("Using WebSocket method", port=settings.pyrevit_port)
                 result = await self._execute_via_websocket(prepared_code, timeout)
             else:
                 # Method 2: File-based execution with pyRevit CLI
+                logger.info("Using CLI method (WebSocket disabled)")
                 result = await self._execute_via_cli(prepared_code, timeout)
             
             execution_time = time.time() - start_time

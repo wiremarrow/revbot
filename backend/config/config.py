@@ -34,9 +34,9 @@ class Settings(BaseSettings):
     )
     
     # pyRevit Configuration
-    pyrevit_port: int = Field(
-        default=8080,
-        description="Port for pyRevit communication"
+    pyrevit_port: Optional[int] = Field(
+        default=None,
+        description="Port for pyRevit communication (None = CLI mode)"
     )
     pyrevit_timeout: int = Field(
         default=30,
