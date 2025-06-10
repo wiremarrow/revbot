@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RevBot Debug Frontend</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background-color: #fafafa;
+        }
+        .section h2 {
+            color: #34495e;
+            margin-top: 0;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            resize: vertical;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .execute-btn {
+            background-color: #e74c3c;
+        }
+        .execute-btn:hover {
+            background-color: #c0392b;
+        }
+        .response {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .error {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .success {
+            background-color: #27ae60;
+            color: white;
+        }
+        .loading {
+            color: #f39c12;
+            font-weight: bold;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .quick-test {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        @media (max-width: 768px) {
+            .quick-test {
+                grid-template-columns: 1fr;
+            }
+        }
+        .endpoint-info {
+            background-color: #ecf0f1;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 RevBot Debug Frontend</h1>
+        <p style="text-align: center; color: #7f8c8d;">Debug interface for RevBot API - See full error details and responses</p>
+
+        <!-- Server Status -->
+        <div class="section">
+            <h2>📡 Server Status</h2>
+            <button onclick="checkServerStatus()">Check Server</button>
+            <div id="serverStatus"></div>
+        </div>
+
+        <!-- Code Generation -->
+        <div class="section">
+            <h2>🧠 Code Generation</h2>
+            <div class="endpoint-info">POST /api/v1/generate</div>
+            <textarea id="promptInput" placeholder="Enter your Revit task description here...">Create a wall from point (0,0,0) to point (10,0,0) with height 10 feet</textarea>
+            <br>
+            <button onclick="generateCode()" id="generateBtn">Generate Code</button>
+            <div id="generateResponse"></div>
+        </div>
+
+        <!-- Code Execution -->
+        <div class="section">
+            <h2>⚡ Code Execution</h2>
+            <div class="endpoint-info">POST /api/v1/execute</div>
+            <textarea id="codeInput" placeholder="Python code to execute in Revit..."># Your generated code will appear here</textarea>
+            <br>
+            <button onclick="executeCode()" id="executeBtn" class="execute-btn">Execute in Revit</button>
+            <label>
+                <input type="checkbox" id="safeMode" checked> Safe Mode
+            </label>
+            <div id="executeResponse"></div>
+        </div>
+
+        <!-- Quick Tests -->
+        <div class="section">
+            <h2>🧪 Quick Tests</h2>
+            <div class="quick-test">
+                <button onclick="testListTools()">List Available Tools</button>
+                <button onclick="testHealthCheck()">Health Check</button>
+                <button onclick="testChatEndpoint()">Test Chat Endpoint</button>
+                <button onclick="runFullTest()">Run Full Test Suite</button>
+            </div>
+            <div id="quickTestResponse"></div>
+        </div>
+
+        <!-- Raw Response Viewer -->
+        <div class="section">
+            <h2>🔍 Raw Response Viewer</h2>
+            <p>Full JSON responses and error details will appear here:</p>
+            <div id="rawResponse" class="response"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+
+        // Utility functions
+        function showLoading(elementId) {
+            document.getElementById(elementId).innerHTML = '<div class="status loading">⏳ Loading...</div>';
+        }
+
+        function showError(elementId, message, details = null) {
+            const element = document.getElementById(elementId);
+            let html = `<div class="status error">❌ Error: ${message}</div>`;
+            if (details) {
+                html += `<div class="response error">${JSON.stringify(details, null, 2)}</div>`;
+            }
+            element.innerHTML = html;
+        }
+
+        function showSuccess(elementId, message, details = null) {
+            const element = document.getElementById(elementId);
+            let html = `<div class="status success">✅ ${message}</div>`;
+            if (details) {
+                html += `<div class="response success">${JSON.stringify(details, null, 2)}</div>`;
+            }
+            element.innerHTML = html;
+        }
+
+        function showRawResponse(data, isError = false) {
+            const element = document.getElementById('rawResponse');
+            element.className = `response ${isError ? 'error' : ''}`;
+            element.textContent = JSON.stringify(data, null, 2);
+        }
+
+        // API calls
+        async function makeRequest(endpoint, method = 'GET', body = null) {
+            try {
+                const options = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    timeout: 120000, // 2 minutes
+                };
+                
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
+
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const data = await response.json();
+                
+                showRawResponse(data, !response.ok);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${data.error?.message || 'Unknown error'}`);
+                }
+                
+                return data;
+            } catch (error) {
+                showRawResponse({
+                    error: error.message,
+                    timestamp: new Date().toISOString(),
+                    endpoint: endpoint
+                }, true);
+                throw error;
+            }
+        }
+
+        // Server status
+        async function checkServerStatus() {
+            showLoading('serverStatus');
+            try {
+                const data = await makeRequest('/api/v1/health');
+                showSuccess('serverStatus', 'Server is running', data);
+            } catch (error) {
+                showError('serverStatus', `Server not responding: ${error.message}`);
+            }
+        }
+
+        // Code generation
+        async function generateCode() {
+            const prompt = document.getElementById('promptInput').value;
+            if (!prompt.trim()) {
+                showError('generateResponse', 'Please enter a prompt');
+                return;
+            }
+
+            showLoading('generateResponse');
+            document.getElementById('generateBtn').disabled = true;
+
+            try {
+                const data = await makeRequest('/api/v1/generate', 'POST', {
+                    prompt: prompt,
+                    temperature: 0.2
+                });
+                
+                showSuccess('generateResponse', 'Code generated successfully', data);
+                
+                // Auto-populate code execution area
+                if (data.code) {
+                    document.getElementById('codeInput').value = data.code;
+                }
+            } catch (error) {
+                showError('generateResponse', error.message);
+            } finally {
+                document.getElementById('generateBtn').disabled = false;
+            }
+        }
+
+        // Code execution
+        async function executeCode() {
+            const code = document.getElementById('codeInput').value;
+            const safeMode = document.getElementById('safeMode').checked;
+            
+            if (!code.trim()) {
+                showError('executeResponse', 'Please enter code to execute');
+                return;
+            }
+
+            showLoading('executeResponse');
+            document.getElementById('executeBtn').disabled = true;
+
+            try {
+                const data = await makeRequest('/api/v1/execute', 'POST', {
+                    code: code,
+                    safe_mode: safeMode,
+                    timeout: 30
+                });
+                
+                if (data.status === 'success') {
+                    showSuccess('executeResponse', 'Code executed successfully', data);
+                } else {
+                    showError('executeResponse', 'Execution failed', data);
+                }
+            } catch (error) {
+                showError('executeResponse', error.message);
+            } finally {
+                document.getElementById('executeBtn').disabled = false;
+            }
+        }
+
+        // Quick tests
+        async function testListTools() {
+            showLoading('quickTestResponse');
+            try {
+                const data = await makeRequest('/api/v1/tools');
+                showSuccess('quickTestResponse', 'Tools retrieved', data);
+            } catch (error) {
+                showError('quickTestResponse', error.message);
+            }
+        }
+
+        async function testHealthCheck() {
+            showLoading('quickTestResponse');
+            try {
+                const data = await makeRequest('/api/v1/health');
+                showSuccess('quickTestResponse', 'Health check passed', data);
+            } catch (error) {
+                showError('quickTestResponse', error.message);
+            }
+        }
+
+        async function testChatEndpoint() {
+            showLoading('quickTestResponse');
+            try {
+                const data = await makeRequest('/api/v1/chat?prompt=Create a simple wall&execute_code=false', 'POST');
+                showSuccess('quickTestResponse', 'Chat test completed', data);
+            } catch (error) {
+                showError('quickTestResponse', error.message);
+            }
+        }
+
+        async function runFullTest() {
+            showLoading('quickTestResponse');
+            try {
+                // Test sequence
+                await testHealthCheck();
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                await testListTools();
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Generate test code
+                const generateData = await makeRequest('/api/v1/generate', 'POST', {
+                    prompt: 'Create a simple wall for testing',
+                    temperature: 0.2
+                });
+                
+                if (generateData.code) {
+                    // Try to execute it
+                    const executeData = await makeRequest('/api/v1/execute', 'POST', {
+                        code: generateData.code,
+                        safe_mode: true,
+                        timeout: 30
+                    });
+                    
+                    showSuccess('quickTestResponse', 'Full test suite completed', {
+                        generation: generateData,
+                        execution: executeData
+                    });
+                }
+            } catch (error) {
+                showError('quickTestResponse', `Full test failed: ${error.message}`);
+            }
+        }
+
+        // Initialize
+        window.onload = function() {
+            checkServerStatus();
+        };
+    </script>
+</body>
+</html>

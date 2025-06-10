@@ -3,6 +3,8 @@ Main FastAPI application for RevBot backend.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 import structlog
 
@@ -63,6 +65,12 @@ app.add_exception_handler(Exception, general_exception_handler)
 # Include API routes
 app.include_router(router)
 
+# Serve debug frontend
+@app.get("/debug")
+async def debug_frontend():
+    """Serve the debug frontend."""
+    return FileResponse("debug_frontend.html")
+
 # Root endpoint
 @app.get("/")
 async def root():
@@ -76,7 +84,8 @@ async def root():
             "execute": "/api/v1/execute",
             "chat": "/api/v1/chat",
             "health": "/api/v1/health",
-            "tools": "/api/v1/tools"
+            "tools": "/api/v1/tools",
+            "debug": "/debug"
         }
     }
 
