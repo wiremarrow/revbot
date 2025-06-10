@@ -233,6 +233,32 @@ print("===REVITAI_RESULT_END===")
     
     async def _execute_via_cli(self, code: str, timeout: int) -> Dict[str, Any]:
         """Execute code via pyRevit CLI (file-based)."""
+        
+        # First check if pyRevit CLI is available
+        try:
+            check_process = await asyncio.create_subprocess_exec(
+                'pyrevit',
+                '--version',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await check_process.communicate()
+            if check_process.returncode != 0:
+                return {
+                    "success": False,
+                    "output": "",
+                    "error": "pyRevit CLI not found or not working. Install pyRevit and ensure it's in PATH.",
+                    "revit_state": {}
+                }
+            logger.info("pyRevit CLI found", version=stdout.decode('utf-8').strip())
+        except FileNotFoundError:
+            return {
+                "success": False,
+                "output": "",
+                "error": "pyRevit CLI not found. Install pyRevit and ensure 'pyrevit' command is in PATH.",
+                "revit_state": {}
+            }
+        
         # Create a temporary script file
         with tempfile.NamedTemporaryFile(
             mode='w',
@@ -245,6 +271,8 @@ print("===REVITAI_RESULT_END===")
         
         try:
             # Execute using pyrevit run command
+            logger.info("Executing pyRevit CLI", script_path=script_path)
+            
             process = await asyncio.create_subprocess_exec(
                 'pyrevit',
                 'run',
@@ -260,6 +288,13 @@ print("===REVITAI_RESULT_END===")
             
             output = stdout.decode('utf-8')
             error = stderr.decode('utf-8') if stderr else None
+            
+            logger.info(
+                "pyRevit CLI execution completed",
+                return_code=process.returncode,
+                stdout_length=len(output),
+                stderr_length=len(error) if error else 0
+            )
             
             # Parse the output
             if "===REVITAI_RESULT_START===" in output:
