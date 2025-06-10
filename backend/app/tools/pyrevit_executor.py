@@ -4,6 +4,7 @@ PyRevit script execution tool.
 import asyncio
 import json
 import time
+import sys
 from typing import Dict, Any, Optional
 import aiofiles
 import websockets
@@ -264,6 +265,12 @@ print("===REVITAI_RESULT_END===")
         
         # First check if pyRevit CLI is available
         try:
+            # Use ProactorEventLoop on Windows to fix subprocess issues
+            if sys.platform == "win32":
+                loop = asyncio.get_event_loop()
+                if not isinstance(loop, asyncio.ProactorEventLoop):
+                    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+            
             check_process = await asyncio.create_subprocess_exec(
                 'pyrevit',
                 '--version',
@@ -300,6 +307,12 @@ print("===REVITAI_RESULT_END===")
         try:
             # Execute using pyrevit run command
             logger.info("Executing pyRevit CLI", script_path=script_path)
+            
+            # Ensure ProactorEventLoop on Windows
+            if sys.platform == "win32":
+                loop = asyncio.get_event_loop()
+                if not isinstance(loop, asyncio.ProactorEventLoop):
+                    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
             
             process = await asyncio.create_subprocess_exec(
                 'pyrevit',
