@@ -120,12 +120,20 @@ class PyRevitExecutorTool(BaseTool):
                 "execution_time": timeout
             }
         except Exception as e:
+            import traceback
+            full_traceback = traceback.format_exc()
             logger.error("Script execution failed", error=str(e))
             debug_response.update({
                 "success": False,
                 "error": f"EXCEPTION: {str(e)}",
+                "output": f"FULL EXCEPTION DETAILS: {full_traceback}",
                 "execution_time": time.time() - start_time,
-                "debug_info": {**debug_response["debug_info"], "exception": str(e), "step": "exception_caught"}
+                "debug_info": {
+                    **debug_response["debug_info"], 
+                    "exception": str(e),
+                    "step": "exception_caught",
+                    "full_traceback": full_traceback
+                }
             })
             return debug_response
     
