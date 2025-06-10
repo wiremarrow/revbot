@@ -206,6 +206,111 @@ async with httpx.AsyncClient() as client:
     )
 ```
 
+## 🧪 Testing Steps
+
+### 1. Start the Backend
+
+**Option A: Automated Setup (Recommended)**
+
+*Windows:*
+```cmd
+cd backend
+run.bat
+```
+
+*macOS/Linux:*
+```bash
+cd backend
+./run.sh
+```
+
+**Option B: Manual Setup**
+
+*Windows:*
+```cmd
+cd backend
+revbot\Scripts\activate.bat
+python main.py
+```
+
+*macOS/Linux:*
+```bash
+cd backend
+source revbot/bin/activate
+python main.py
+```
+
+This will start the server on `http://localhost:8000`.
+
+### 2. Test Claude Integration
+
+*Windows:*
+```cmd
+cd backend
+revbot\Scripts\activate.bat
+python test_claude.py
+```
+
+*macOS/Linux:*
+```bash
+cd backend
+source revbot/bin/activate
+python test_claude.py
+```
+
+This verifies your API key works and Claude can respond.
+
+### 3. Test Full API
+
+*Windows:*
+```cmd
+cd backend
+revbot\Scripts\activate.bat
+python example_usage.py
+```
+
+*macOS/Linux:*
+```bash
+cd backend
+source revbot/bin/activate
+python example_usage.py
+```
+
+This tests all endpoints:
+- Code generation from natural language
+- Tool listing
+- Code execution (simulation)
+- Chat endpoint
+
+### 4. Manual API Testing
+You can also test with curl:
+
+**Generate Code:**
+```bash
+curl -X POST "http://localhost:8000/api/v1/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Create a wall from point (0,0,0) to (10,0,0)"}'
+```
+
+**List Tools:**
+```bash
+curl "http://localhost:8000/api/v1/tools"
+```
+
+### 5. View API Documentation
+Visit `http://localhost:8000/docs` for interactive Swagger UI.
+
+### 6. Environment Management
+
+**Activate virtual environment:**
+- Windows: `revbot\Scripts\activate.bat`
+- macOS/Linux: `source revbot/bin/activate`
+
+**Deactivate virtual environment:**
+```bash
+deactivate
+```
+
 ## Development
 
 ### Running Tests
