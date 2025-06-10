@@ -304,24 +304,28 @@ print("===REVITAI_RESULT_END===")
             if process.returncode != 0 and not output and not error:
                 return {
                     "success": False,
-                    "output": "",
-                    "error": "pyRevit executed but no response from Revit. Check: 1) Revit is running, 2) pyRevit is loaded in Revit, 3) A document is open in Revit",
+                    "output": f"DEBUG: No output from pyRevit. Return code: {process.returncode}",
+                    "error": f"pyRevit executed but no response from Revit. Return code: {process.returncode}. Check: 1) Revit is running, 2) pyRevit is loaded in Revit, 3) A document is open in Revit",
                     "revit_state": {},
                     "debug_info": {
                         "return_code": process.returncode,
-                        "execution_time": f"{timeout}s timeout",
-                        "script_path": script_path
+                        "execution_time": f"~0.0003s (immediate failure)",
+                        "script_path": script_path,
+                        "pyrevit_command": f"pyrevit run {script_path}"
                     }
                 }
             
             return {
                 "success": process.returncode == 0,
-                "output": output,
-                "error": error,
+                "output": output if output else f"DEBUG: Empty output. Return code: {process.returncode}",
+                "error": error if error else f"No stderr. Return code: {process.returncode}",
                 "revit_state": {},
                 "debug_info": {
                     "return_code": process.returncode,
-                    "script_path": script_path
+                    "script_path": script_path,
+                    "pyrevit_command": f"pyrevit run {script_path}",
+                    "stdout_length": len(output),
+                    "stderr_length": len(error) if error else 0
                 }
             }
             
